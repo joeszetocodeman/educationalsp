@@ -2,7 +2,7 @@ package analysis
 
 import (
 	"educationalsp/lsp"
-	"fmt"
+	"log"
 	"strings"
 )
 
@@ -58,7 +58,7 @@ func (s *State) UpdateDocument(uri, text string) []lsp.Diagnostic {
 func (s *State) Hover(id int, uri string, position lsp.Position) lsp.HoverResponse {
 	// In real life, this would look up the type in our type analysis code...
 
-	document := s.Documents[uri]
+	// document := s.Documents[uri]
 
 	return lsp.HoverResponse{
 		Response: lsp.Response{
@@ -66,7 +66,7 @@ func (s *State) Hover(id int, uri string, position lsp.Position) lsp.HoverRespon
 			ID:  &id,
 		},
 		Result: lsp.HoverResult{
-			Contents: fmt.Sprintf("File: %s, Characters: %d", uri, len(document)),
+			Contents: "",
 		},
 	}
 }
@@ -94,40 +94,14 @@ func (s *State) Definition(id int, uri string, position lsp.Position) lsp.Defini
 		},
 	}
 }
-func (s *State) TextDocumentCodeAction(id int, uri string) lsp.TextDocumentCodeActionResponse {
+func (s *State) TextDocumentCodeAction(logger *log.Logger, id int, params lsp.TextDocumentCodeActionParams) lsp.TextDocumentCodeActionResponse {
+	uri := params.TextDocument.URI
 	text := s.Documents[uri]
+	hoverRange := params.Range
+	hoverText := textInRange(text, hoverRange)
 
 	actions := []lsp.CodeAction{}
-	for row, line := range strings.Split(text, "\n") {
-		idx := strings.Index(line, "VS Code")
-		if idx >= 0 {
-			replaceChange := map[string][]lsp.TextEdit{}
-			replaceChange[uri] = []lsp.TextEdit{
-				{
-					Range:   LineRange(row, idx, idx+len("VS Code")),
-					NewText: "Neovim",
-				},
-			}
-
-			actions = append(actions, lsp.CodeAction{
-				Title: "Replace VS C*de with a superior editor",
-				Edit:  &lsp.WorkspaceEdit{Changes: replaceChange},
-			})
-
-			censorChange := map[string][]lsp.TextEdit{}
-			censorChange[uri] = []lsp.TextEdit{
-				{
-					Range:   LineRange(row, idx, idx+len("VS Code")),
-					NewText: "VS C*de",
-				},
-			}
-
-			actions = append(actions, lsp.CodeAction{
-				Title: "Censor to VS C*de",
-				Edit:  &lsp.WorkspaceEdit{Changes: censorChange},
-			})
-		}
-	}
+	actions = append(actions, phpTraditionalFunctionToArrowCodeActions(uri, hoverText, hoverRange)...)
 
 	response := lsp.TextDocumentCodeActionResponse{
 		Response: lsp.Response{
@@ -173,4 +147,48 @@ func LineRange(line, start, end int) lsp.Range {
 			Character: end,
 		},
 	}
+}
+
+func textInRange(text string, r lsp.Range) string {
+	lines := strings.Split(text, "\n")
+	if len(lines) == 0 {
+		return ""
+	}
+
+	if r.Start.Line < 0 || r.End.Line < 0 || r.Start.Line >= len(lines) || r.End.Line >= len(lines) {
+		return ""
+	}
+	if r.Start.Line > r.End.Line {
+		return ""
+	}
+
+	if r.Start.Line == r.End.Line {
+		line := lines[r.Start.Line]
+		if r.Start.Character < 0 || r.End.Character < r.Start.Character || r.End.Character > len(line) {
+			return ""
+		}
+		return line[r.Start.Character:r.End.Character]
+	}
+
+	var b strings.Builder
+	for line := r.Start.Line; line <= r.End.Line; line++ {
+		start := 0
+		end := len(lines[line])
+		if line == r.Start.Line {
+			start = r.Start.Character
+		}
+		if line == r.End.Line {
+			end = r.End.Character
+		}
+		if start < 0 || end < start || end > len(lines[line]) {
+			return ""
+		}
+
+		if line > r.Start.Line {
+			b.WriteString("\n")
+		}
+		b.WriteString(lines[line][start:end])
+	}
+
+	return b.String()
 }

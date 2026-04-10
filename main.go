@@ -12,8 +12,7 @@ import (
 )
 
 func main() {
-	logger := getLogger("/home/tjdevries/git/educationalsp/log.txt")
-	logger.Println("Hey, I started!")
+	logger := getLogger("/Users/joe.szeto/Developer/educationalsp/log.txt")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(rpc.Split)
@@ -124,7 +123,7 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 		}
 
 		// Create a response
-		response := state.TextDocumentCodeAction(request.ID, request.Params.TextDocument.URI)
+		response := state.TextDocumentCodeAction(logger, request.ID, request.Params)
 
 		// Write it back
 		writeResponse(writer, response)
